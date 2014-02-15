@@ -16,7 +16,7 @@ def parse_headers_into_list(data):
     headers = [h.strip() for h in rows.pop(0).split('|')]
     return headers
 
-def parse_data_into_lists(data):
+def parse_data_into_lists(data, format_funcs=None):
     # throw out leading/trailing space and pipes
     # so we can split on the data without getting
     # extra empty fields
@@ -32,16 +32,34 @@ def parse_data_into_lists(data):
     # [[1, 'foo'], [2, 'bar']]
     values = []
     
-    for row in rows:
-        values.append(
-            [l.strip() for l in row.split('|')]
-            )
+    if format_funcs:
+        for row in rows:
+            values.append(
+                # call appropriate formatters for data found in columns
+                [format_funcs[idx](l.strip()) for idx, l in enumerate(row.split('|'))]
+                )
+    else:
+        for row in rows:
+            values.append(
+                [l.strip() for l in row.split('|')]
+                )
     
     return values
 
-def create_rows(cursor, table_name, data):    
+def create_rows(cursor, table_name, data, format_funcs=None):
+    """
+    Creates db rows using given cursor, with table name provided,
+    using data formatted like:
+    
+    |colname1|colname2|
+    |value2  |value2  |
+    
+    format_funcs is a list of functions to call to format each column
+    first function used for column1, second function used for column2...
+    returns the formatted data as it would have been sent to the db.
+    """
     headers = parse_headers_into_list(data)
-    values = parse_data_into_lists(data)
+    values = parse_data_into_lists(data, format_funcs=format_funcs)
     
     # build the CQL and execute it
     statements = []
@@ -53,13 +71,18 @@ def create_rows(cursor, table_name, data):
     
     for stmt in statements:
         cursor.execute(stmt)
+    
+    from pprint import pprint
+    pprint(values)
+    pprint(statements)
+    return values
 
-def inner_quotify(string):
-    # takes a string like 'foo' and turns it into "'foo'"
-    # to simplify comparison because parse_data_into_lists
-    # makes a string like "'foo'" but data coming from the db
-    # will look like 'foo'
-    return "'{val}'".format(val=string)
+def cql_str(val):
+    """
+    Changes "val" to "'val'", so the inner values
+    can easily be used in cql.
+    """
+    return "'{replace}'".format(replace=val)
 
 def flatten_into_set(iterable):
     # flattens a nested list like: [[1, one, bananas], [2, two, oranges]]

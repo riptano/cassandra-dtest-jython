@@ -2,7 +2,7 @@ import time
 import unittest
 from base import HybridTester
 
-from datahelp import create_rows, parse_data_into_lists, inner_quotify, flatten_into_set
+from datahelp import create_rows, parse_data_into_lists, flatten_into_set, cql_str
 
 #java
 from com.datastax.driver.core import SimpleStatement, BoundStatement
@@ -154,14 +154,14 @@ class TestPagingSize(HybridTester, PageAssertionMixin):
         cursor.execute("CREATE TABLE paging_test ( id int PRIMARY KEY, value text )")
 
         data = """
-            |id| value            |
-            |1 |'testing'         |
-            |2 |'and more testing'|
-            |3 |'and more testing'|
-            |4 |'and more testing'|
-            |5 |'and more testing'|
+            |id| value          |
+            |1 |testing         |
+            |2 |and more testing|
+            |3 |and more testing|
+            |4 |and more testing|
+            |5 |and more testing|
             """
-        create_rows(cursor, 'paging_test', data)
+        expected_data = create_rows(cursor, 'paging_test', data, format_funcs=(str, cql_str))
 
         stmt = SimpleStatement("select * from paging_test")
         stmt.setFetchSize(100)
@@ -169,11 +169,9 @@ class TestPagingSize(HybridTester, PageAssertionMixin):
         results = cursor.execute(stmt)
         self.assertTrue(results.isFullyFetched())
         
-        expected_data = parse_data_into_lists(data)
-        
         actual_data = []
         for row in results:
-            row_data = [str(row.getInt('id')), inner_quotify(row.getString('value'))]
+            row_data = [str(row.getInt('id')), cql_str(row.getString('value'))]
             actual_data.append(row_data)
             self.assertTrue(row_data in expected_data)
 
@@ -190,27 +188,26 @@ class TestPagingSize(HybridTester, PageAssertionMixin):
         cursor.execute("CREATE TABLE paging_test ( id int PRIMARY KEY, value text )")
 
         data = """
-            |id| value            |
-            |1 |'testing'         |
-            |2 |'and more testing'|
-            |3 |'and more testing'|
-            |4 |'and more testing'|
-            |5 |'and more testing'|
-            |6 |'testing'         |
-            |7 |'and more testing'|
-            |8 |'and more testing'|
-            |9 |'and more testing'|
+            |id| value          |
+            |1 |testing         |
+            |2 |and more testing|
+            |3 |and more testing|
+            |4 |and more testing|
+            |5 |and more testing|
+            |6 |testing         |
+            |7 |and more testing|
+            |8 |and more testing|
+            |9 |and more testing|
             """
-        create_rows(cursor, 'paging_test', data)
+        expected_data = create_rows(cursor, 'paging_test', data, format_funcs=(str, cql_str))
 
         stmt = SimpleStatement("select * from paging_test")
         stmt.setFetchSize(5)
 
         results = cursor.execute(stmt)
-        expected_data = parse_data_into_lists(data)
         
         pf = PageFetcher(
-            results, formatters = [('id', 'getInt', str), ('value', 'getString', inner_quotify)]
+            results, formatters = [('id', 'getInt', str), ('value', 'getString', cql_str)]
             )
 
         pf.get_all_pages()
@@ -230,23 +227,22 @@ class TestPagingSize(HybridTester, PageAssertionMixin):
         cursor.execute("CREATE TABLE paging_test ( id int PRIMARY KEY, value text )")
 
         data = """
-            |id| value            |
-            |1 |'testing'         |
-            |2 |'and more testing'|
-            |3 |'and more testing'|
-            |4 |'and more testing'|
-            |5 |'and more testing'|
+            |id| value          |
+            |1 |testing         |
+            |2 |and more testing|
+            |3 |and more testing|
+            |4 |and more testing|
+            |5 |and more testing|
             """
-        create_rows(cursor, 'paging_test', data)
+        expected_data = create_rows(cursor, 'paging_test', data, format_funcs=(str, cql_str))
 
         stmt = SimpleStatement("select * from paging_test")
         stmt.setFetchSize(5)
 
         results = cursor.execute(stmt)
-        expected_data = parse_data_into_lists(data)
         
         pf = PageFetcher(
-            results, formatters = [('id', 'getInt', str), ('value', 'getString', inner_quotify)]
+            results, formatters = [('id', 'getInt', str), ('value', 'getString', cql_str)]
             )
 
         pf.get_all_pages()
@@ -269,23 +265,22 @@ class TestPagingSize(HybridTester, PageAssertionMixin):
         cursor.execute("CREATE TABLE paging_test ( id int PRIMARY KEY, value text )")
 
         data = """
-            |id| value            |
-            |1 |'testing'         |
-            |2 |'and more testing'|
-            |3 |'and more testing'|
-            |4 |'and more testing'|
-            |5 |'and more testing'|
+            |id|value           |
+            |1 |testing         |
+            |2 |and more testing|
+            |3 |and more testing|
+            |4 |and more testing|
+            |5 |and more testing|
             """
-        create_rows(cursor, 'paging_test', data)
+        expected_data = create_rows(cursor, 'paging_test', data, format_funcs=(str, cql_str))
 
         stmt = SimpleStatement("select * from paging_test")
         stmt.setFetchSize(0)
 
         results = cursor.execute(stmt)
-        expected_data = parse_data_into_lists(data)
         
         pf = PageFetcher(
-            results, formatters = [('id', 'getInt', str), ('value', 'getString', inner_quotify)]
+            results, formatters = [('id', 'getInt', str), ('value', 'getString', cql_str)]
             )
 
         pf.get_all_pages()
@@ -316,29 +311,28 @@ class TestPagingWithModifiers(HybridTester, PageAssertionMixin):
             """)
 
         data = """
-            |id| value|
-            |1 |'a'   |
-            |2 |'b'   |
-            |3 |'c'   |
-            |4 |'d'   |
-            |5 |'e'   |
-            |6 |'f'   |
-            |7 |'g'   |
-            |8 |'h'   |
-            |9 |'i'   |
-            |10|'j'   |
+            |id|value|
+            |1 |a    |
+            |2 |b    |
+            |3 |c    |
+            |4 |d    | 
+            |5 |e    | 
+            |6 |f    | 
+            |7 |g    | 
+            |8 |h    |
+            |9 |i    |
+            |10|j    |
             """
         
-        create_rows(cursor, 'paging_test', data)
+        expected_data = create_rows(cursor, 'paging_test', data, format_funcs=(str, cql_str))
 
         stmt = SimpleStatement("select * from paging_test")
         stmt.setFetchSize(5)
 
         results = cursor.execute(stmt)
-        expected_data = parse_data_into_lists(data)
         
         pf = PageFetcher(
-            results, formatters = [('id', 'getInt', str), ('value', 'getString', inner_quotify)]
+            results, formatters = [('id', 'getInt', str), ('value', 'getString', cql_str)]
             )
 
         pf.get_all_pages()
@@ -358,27 +352,26 @@ class TestPagingWithModifiers(HybridTester, PageAssertionMixin):
         cursor.execute("CREATE TABLE paging_test ( id int PRIMARY KEY, value text )")
 
         data = """
-            |id| value            |
-            |1 |'testing'         |
-            |2 |'and more testing'|
-            |3 |'and more testing'|
-            |4 |'and more testing'|
-            |5 |'and more testing'|
-            |6 |'testing'         |
-            |7 |'and more testing'|
-            |8 |'and more testing'|
-            |9 |'and more testing'|
+            |id|value           |
+            |1 |testing         |
+            |2 |and more testing|
+            |3 |and more testing|
+            |4 |and more testing|
+            |5 |and more testing|
+            |6 |testing         |
+            |7 |and more testing|
+            |8 |and more testing|
+            |9 |and more testing|
             """
-        create_rows(cursor, 'paging_test', data)
+        expected_data = create_rows(cursor, 'paging_test', data, format_funcs=(str, cql_str))
 
         stmt = SimpleStatement("select * from paging_test limit 5")
         stmt.setFetchSize(9)
 
         results = cursor.execute(stmt)
-        expected_data = parse_data_into_lists(data)
         
         pf = PageFetcher(
-            results, formatters = [('id', 'getInt', str), ('value', 'getString', inner_quotify)]
+            results, formatters = [('id', 'getInt', str), ('value', 'getString', cql_str)]
             )
 
         pf.get_all_pages()
@@ -394,7 +387,7 @@ class TestPagingWithModifiers(HybridTester, PageAssertionMixin):
         results = cursor.execute(stmt)
         
         pf = PageFetcher(
-            results, formatters = [('id', 'getInt', str), ('value', 'getString', inner_quotify)]
+            results, formatters = [('id', 'getInt', str), ('value', 'getString', cql_str)]
             )
         pf.get_all_pages()
         self.assertEqual(pf.pagecount(), 2)
@@ -455,10 +448,10 @@ class TestPagingQueryIsolation(HybridTester, PageAssertionMixin):
     pass
 
 if __name__ == '__main__':
-    # unittest.main()
-    suite = unittest.TestSuite()
-    suite.addTest(TestPagingWithModifiers("test_with_limit"))
+    unittest.main()
+    # suite = unittest.TestSuite()
+    # suite.addTest(TestPagingSize("test_with_less_results_than_page_size"))
     
-    unittest.TextTestRunner(verbosity=2).run(suite)
+    # unittest.TextTestRunner(verbosity=2).run(suite)
     
-    exit(0)
+    # exit(0)
