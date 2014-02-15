@@ -37,10 +37,6 @@
     <exec executable="${jython.dir}/bin/easy_install">
       <arg value="pylib/ccm-git-3b4441e54e53.zip" />
     </exec>
-    <!-- Nose -->
-    <exec executable="${jython.dir}/bin/easy_install">
-      <arg value="pylib/nose-1.3.0.tar.gz" />
-    </exec>
   </target>
   
   <target name="build.dir.check">
