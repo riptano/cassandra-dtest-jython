@@ -12,7 +12,6 @@ def wait_for_node_alive(node):
     # for now let's just pause
     time.sleep(10)
 
-
 class Page(object):
     data = None
     
@@ -38,8 +37,7 @@ class Page(object):
                 )
         
         self.data.append(values)
-            
-            
+                        
 class PageFetcher(object):
     """
     Fethches result rows and breaks into pages.
@@ -105,7 +103,6 @@ class PageFetcher(object):
         
         return all_pages_combined
 
-
 class PageAssertionMixin(object):
     """Can be added to subclasses of unittest.Tester"""
     def assertEqualIgnoreOrder(self, one, two):
@@ -119,7 +116,9 @@ class PageAssertionMixin(object):
             flatten_into_set(one),
             flatten_into_set(two)
             )
-
+    
+    def assertIsSubsetOf(self, subset, superset):
+        assert flatten_into_set(subset).issubset(flatten_into_set(superset))
 
 class TestPagingSize(HybridTester, PageAssertionMixin):
     """
@@ -295,18 +294,124 @@ class TestPagingSize(HybridTester, PageAssertionMixin):
         
         # make sure expected and actual have same data elements (ignoring order)
         self.assertEqualIgnoreOrder(expected_data, pf.all_data())
-    
+
 class TestPagingWithModifiers(HybridTester, PageAssertionMixin):
     """
     Tests concerned with paging when CQL modifiers (such as order, limit, allow filtering) are used.
     """
     def test_with_order_by(self):
-        pass
+        cluster = self.cluster
+        cluster.populate(3).start()
+        node1, node2, node3 = cluster.nodelist()
+        wait_for_node_alive(node1)
+        cursor = self.cql_connection(node1).cursor()
+        self.create_ks(cursor, 'test_paging', 2)
+        cursor.execute(
+            """
+            CREATE TABLE paging_test (
+                id int,
+                sometext text,
+                PRIMARY KEY (id, sometext)
+            ) WITH CLUSTERING ORDER BY (sometext)
+            """)
+
+        data = """
+            |id| value|
+            |1 |'a'   |
+            |2 |'b'   |
+            |3 |'c'   |
+            |4 |'d'   |
+            |5 |'e'   |
+            |6 |'f'   |
+            |7 |'g'   |
+            |8 |'h'   |
+            |9 |'i'   |
+            |10|'j'   |
+            """
+        
+        create_rows(cursor, 'paging_test', data)
+
+        stmt = SimpleStatement("select * from paging_test")
+        stmt.setFetchSize(5)
+
+        results = cursor.execute(stmt)
+        expected_data = parse_data_into_lists(data)
+        
+        pf = PageFetcher(
+            results, formatters = [('id', 'getInt', str), ('value', 'getString', inner_quotify)]
+            )
+
+        pf.get_all_pages()
+        self.assertEqual(pf.pagecount(), 2)
+        self.assertEqual(pf.num_results_all_pages(), [5, 5])
+        
+        # these should be equal (in the same order)
+        self.assertEqual(expected_data, pf.all_data())
     
     def test_with_limit(self):
-        pass
+        cluster = self.cluster
+        cluster.populate(3).start()
+        node1, node2, node3 = cluster.nodelist()
+        wait_for_node_alive(node1)
+        cursor = self.cql_connection(node1).cursor()
+        self.create_ks(cursor, 'test_paging_size', 2)
+        cursor.execute("CREATE TABLE paging_test ( id int PRIMARY KEY, value text )")
+
+        data = """
+            |id| value            |
+            |1 |'testing'         |
+            |2 |'and more testing'|
+            |3 |'and more testing'|
+            |4 |'and more testing'|
+            |5 |'and more testing'|
+            |6 |'testing'         |
+            |7 |'and more testing'|
+            |8 |'and more testing'|
+            |9 |'and more testing'|
+            """
+        create_rows(cursor, 'paging_test', data)
+
+        stmt = SimpleStatement("select * from paging_test limit 5")
+        stmt.setFetchSize(9)
+
+        results = cursor.execute(stmt)
+        expected_data = parse_data_into_lists(data)
+        
+        pf = PageFetcher(
+            results, formatters = [('id', 'getInt', str), ('value', 'getString', inner_quotify)]
+            )
+
+        pf.get_all_pages()
+        self.assertEqual(pf.pagecount(), 1)
+        self.assertEqual(pf.num_results_all_pages(), [5])
+        
+        # make sure all the data retrieved is a subset of input data
+        self.assertIsSubsetOf(pf.all_data(), expected_data)
+        
+        # let's do another query with a limit larger than one page
+        stmt = SimpleStatement("select * from paging_test limit 8")
+        stmt.setFetchSize(5)
+        results = cursor.execute(stmt)
+        
+        pf = PageFetcher(
+            results, formatters = [('id', 'getInt', str), ('value', 'getString', inner_quotify)]
+            )
+        pf.get_all_pages()
+        self.assertEqual(pf.pagecount(), 2)
+        self.assertEqual(pf.num_results_all_pages(), [5, 3])
+        self.assertIsSubsetOf(pf.all_data(), expected_data)
     
     def test_with_allow_filtering(self):
+        pass
+
+class TestPagingData(HybridTester, PageAssertionMixin):
+    def test_paging_a_single_wide_row(self):
+        pass
+    
+    def test_paging_across_multi_wide_rows(self):
+        pass
+    
+    def test_paging_using_secondary_indexes(self):
         pass
 
 class TestPagingSizeChange(HybridTester, PageAssertionMixin):
@@ -352,7 +457,7 @@ class TestPagingQueryIsolation(HybridTester, PageAssertionMixin):
 if __name__ == '__main__':
     # unittest.main()
     suite = unittest.TestSuite()
-    suite.addTest(TestPagingSize("test_null_is_not_valid_page_size"))
+    suite.addTest(TestPagingWithModifiers("test_with_limit"))
     
     unittest.TextTestRunner(verbosity=2).run(suite)
     
