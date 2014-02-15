@@ -449,9 +449,3 @@ class TestPagingQueryIsolation(HybridTester, PageAssertionMixin):
 
 if __name__ == '__main__':
     unittest.main()
-    # suite = unittest.TestSuite()
-    # suite.addTest(TestPagingSize("test_with_less_results_than_page_size"))
-    
-    # unittest.TextTestRunner(verbosity=2).run(suite)
-    
-    # exit(0)
