@@ -295,6 +295,10 @@ class TestPagingWithModifiers(HybridTester, PageAssertionMixin):
     Tests concerned with paging when CQL modifiers (such as order, limit, allow filtering) are used.
     """
     def test_with_order_by(self):
+        """"
+        Paging over a single partition with ordering should work.
+        (Spanning multiple partitions won't though, by design. See CASSANDRA-6722).
+        """
         cluster = self.cluster
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
@@ -305,28 +309,28 @@ class TestPagingWithModifiers(HybridTester, PageAssertionMixin):
             """
             CREATE TABLE paging_test (
                 id int,
-                sometext text,
-                PRIMARY KEY (id, sometext)
-            ) WITH CLUSTERING ORDER BY (sometext)
+                value text,
+                PRIMARY KEY (id, value)
+            ) WITH CLUSTERING ORDER BY (value ASC)
             """)
 
         data = """
             |id|value|
             |1 |a    |
-            |2 |b    |
-            |3 |c    |
-            |4 |d    | 
-            |5 |e    | 
-            |6 |f    | 
-            |7 |g    | 
-            |8 |h    |
-            |9 |i    |
-            |10|j    |
+            |1 |b    |
+            |1 |c    |
+            |1 |d    | 
+            |1 |e    | 
+            |1 |f    | 
+            |1 |g    | 
+            |1 |h    |
+            |1 |i    |
+            |1 |j    |
             """
         
         expected_data = create_rows(cursor, 'paging_test', data, format_funcs=(str, cql_str))
 
-        stmt = SimpleStatement("select * from paging_test")
+        stmt = SimpleStatement("select * from paging_test where id in (1,2) order by value asc")
         stmt.setFetchSize(5)
 
         results = cursor.execute(stmt)
