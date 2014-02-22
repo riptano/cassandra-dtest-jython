@@ -50,13 +50,6 @@
   <target name="build-if-needed" depends="build.dir.check" unless="build.dir.exists">
     <antcall target="build"/>
   </target>
-
-  <target name="run" depends="build-if-needed">
-    <java classpathref="lib.path.id" classname="org.python.util.jython" failonerror="true" fork="true">
-      <arg value="-Dpython.path=${lib.dir}"/>
-      <arg value="paging_example.py"/>
-    </java>
-  </target>
   
   <target name="run_tests" depends="build-if-needed">
     <java classpathref="lib.path.id" classname="org.python.util.jython" failonerror="true" fork="true">
