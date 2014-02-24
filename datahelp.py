@@ -1,3 +1,4 @@
+import re
 
 def strip(val):
     # remove spaces and pipes from beginning/end
@@ -16,6 +17,41 @@ def parse_headers_into_list(data):
     headers = [h.strip() for h in rows.pop(0).split('|')]
     return headers
 
+def get_row_multiplier(row):
+    # find prefix like *1234 meaning create 1,234 rows
+    row_cells = [l.strip() for l in row.split('|')]
+    m = re.findall('\*(\d+)$', row_cells[0])
+
+    if m:
+        return int(m[0])
+
+    return None
+
+def row_has_multiplier(row):
+    if get_row_multiplier(row) != None:
+        return True
+        
+    return False
+
+def parse_row_into_list(row, format_funcs=None):
+    row_cells = [l.strip() for l in row.split('|')]
+    
+    if row_has_multiplier(row):
+        row_multiplier = get_row_multiplier(row)
+        row = '|'.join(row_cells[1:]) # cram remainder of row back into foo|bar format
+        multirows = []
+        
+        for i in range(row_multiplier):
+            multirows.append(
+                parse_row_into_list(row, format_funcs=format_funcs)
+                )
+        return multirows
+
+    if format_funcs:
+        return [format_funcs[idx](cell) for idx, cell in enumerate(row_cells)]
+    else:
+        return [l.strip() for l in row_cells]
+
 def parse_data_into_lists(data, format_funcs=None):
     # throw out leading/trailing space and pipes
     # so we can split on the data without getting
@@ -28,21 +64,13 @@ def parse_data_into_lists(data, format_funcs=None):
     # remove headers
     rows.pop(0)
     
-    # for the actual data values, remove extra spaces and format into list of lists
-    # [[1, 'foo'], [2, 'bar']]
     values = []
     
-    if format_funcs:
-        for row in rows:
-            values.append(
-                # call appropriate formatters for data found in columns
-                [format_funcs[idx](l.strip()) for idx, l in enumerate(row.split('|'))]
-                )
-    else:
-        for row in rows:
-            values.append(
-                [l.strip() for l in row.split('|')]
-                )
+    for row in rows:
+        if row_has_multiplier(row):
+            values.extend(parse_row_into_list(row, format_funcs=format_funcs))
+        else:
+            values.append(parse_row_into_list(row, format_funcs=format_funcs))
     
     return values
 
@@ -72,9 +100,6 @@ def create_rows(cursor, table_name, data, format_funcs=None):
     for stmt in statements:
         cursor.execute(stmt)
     
-    from pprint import pprint
-    pprint(values)
-    pprint(statements)
     return values
 
 def cql_str(val):

@@ -1,4 +1,4 @@
-import time
+import time, uuid
 import unittest
 from base import HybridTester
 
@@ -450,11 +450,73 @@ class TestPagingWithModifiers(HybridTester, PageAssertionMixin):
 
 class TestPagingData(HybridTester, PageAssertionMixin):
     def test_paging_a_single_wide_row(self):
-        pass
+        cluster = self.cluster
+        cluster.populate(3).start()
+        node1, node2, node3 = cluster.nodelist()
+        wait_for_node_alive(node1)
+        cursor = self.cql_connection(node1).cursor()
+        self.create_ks(cursor, 'test_paging_size', 2)
+        cursor.execute("CREATE TABLE paging_test ( id int, value text, PRIMARY KEY (id, value) )")
+
+        def random_txt(text):
+            return "'{random}'".format(random=uuid.uuid1())
+
+        data = """
+              | id | value                  |
+        *10000| 1  | [replaced with random] |
+            """
+        expected_data = create_rows(cursor, 'paging_test', data, format_funcs=(str, random_txt))
+        
+        stmt = SimpleStatement("select * from paging_test where id = 1")
+        stmt.setFetchSize(3000)
+
+        results = cursor.execute(stmt)
+        
+        pf = PageFetcher(
+            results, formatters = [('id', 'getInt', str), ('value', 'getString', cql_str)]
+            )
+        pf.get_all_pages()
+        self.assertEqual(pf.pagecount(), 4)
+        self.assertEqual(pf.num_results_all_pages(), [3000, 3000, 3000, 1000])
+        
+        # make sure the allow filtering query matches the expected results (ignoring order)
+        self.assertEqualIgnoreOrder(pf.all_data(), expected_data)
     
     def test_paging_across_multi_wide_rows(self):
-        pass
-    
+        cluster = self.cluster
+        cluster.populate(3).start()
+        node1, node2, node3 = cluster.nodelist()
+        wait_for_node_alive(node1)
+        cursor = self.cql_connection(node1).cursor()
+        self.create_ks(cursor, 'test_paging_size', 2)
+        cursor.execute("CREATE TABLE paging_test ( id int, value text, PRIMARY KEY (id, value) )")
+
+        def random_txt(text):
+            return "'{random}'".format(random=uuid.uuid1())
+
+        data = """
+              | id | value                  |
+         *5000| 1  | [replaced with random] |
+         *5000| 2  | [replaced with random] |
+            """
+        expected_data = create_rows(cursor, 'paging_test', data, format_funcs=(str, random_txt))
+        
+        stmt = SimpleStatement("select * from paging_test where id in (1,2)")
+        stmt.setFetchSize(3000)
+
+        results = cursor.execute(stmt)
+        
+        pf = PageFetcher(
+            results, formatters = [('id', 'getInt', str), ('value', 'getString', cql_str)]
+            )
+        pf.get_all_pages()
+        self.assertEqual(pf.pagecount(), 4)
+        self.assertEqual(pf.num_results_all_pages(), [3000, 3000, 3000, 1000])
+        
+        print pf.all_data()
+        # make sure the allow filtering query matches the expected results
+        self.assertEqualIgnoreOrder(pf.all_data(), expected_data)
+        
     def test_paging_using_secondary_indexes(self):
         pass
 
@@ -499,4 +561,10 @@ class TestPagingQueryIsolation(HybridTester, PageAssertionMixin):
     pass
 
 if __name__ == '__main__':
-    unittest.main()
+    # unittest.main()
+    suite = unittest.TestSuite()
+    suite.addTest(TestPagingData("test_paging_across_multi_wide_rows"))
+    
+    unittest.TextTestRunner(verbosity=2).run(suite)
+    
+    exit(0)
