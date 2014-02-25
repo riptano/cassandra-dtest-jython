@@ -110,13 +110,18 @@ def cql_str(val):
     return "'{replace}'".format(replace=val)
 
 def flatten_into_set(iterable):
+    # use flatten() then convert to a set for set comparisons
+    return set(flatten(iterable))
+
+def flatten(iterable):
     # flattens a nested list like: [[1, one, bananas], [2, two, oranges]]
-    # into: set([1__one__bananas, 2__two__oranges]) (all elements cast as str)
-    # why? so the set can be used in set comparisons
+    # into: [1__one__bananas, 2__two__oranges] (all elements cast as str)
+    # why? so the lists can be compared more easily
+    
     flattened = []
     
     for sublist in iterable:
         items = [str(item) for item in sublist]
         flattened.append('__'.join(items))
     
-    return set(flattened)
+    return flattened
