@@ -1,4 +1,4 @@
-<project xmlns:ivy="antlib:org.apache.ivy.ant" name="JythonCassandraExample" default="run">
+<project xmlns:ivy="antlib:org.apache.ivy.ant" name="CassandraDtestJython" default="run">
 
   <property name="build.dir" value="build/" />
   <property name="lib.dir" value="${build.dir}/lib" />
