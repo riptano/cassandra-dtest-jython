@@ -1,5 +1,5 @@
 <ivy-module version="2.0">
-    <info organisation="com.datastax" module="JythonCassandraExample"/>
+    <info organisation="com.datastax" module="CassandraDtestJython"/>
     <dependencies>
         <dependency org="org.python" name="jython-installer" rev="2.7-b1"/>
         <dependency org="com.datastax.cassandra"
