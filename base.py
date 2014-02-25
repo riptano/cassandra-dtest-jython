@@ -50,8 +50,7 @@ class ConnectionProxy(object):
         return self._session
     
     def close(self):
-        print "close called!"
-        self._session.shutdown()
+        self._session.close()
 
 
 class HybridTester(TestCase):
