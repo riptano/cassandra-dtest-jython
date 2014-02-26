@@ -5,8 +5,7 @@ from base import HybridTester
 from datahelp import create_rows, parse_data_into_lists, flatten_into_set, cql_str
 
 #java
-from com.datastax.driver.core import SimpleStatement, BoundStatement
-
+from com.datastax.driver.core import SimpleStatement, BoundStatement, exceptions
 
 def wait_for_node_alive(node):
     # for now let's just pause
@@ -72,22 +71,22 @@ class PageFetcher(object):
         results = self.results
         formatters = self.formatters
         
-        page = Page()
-        while not results.isExhausted():
-            # last result? let's grab it, then start a new page
-            if results.getAvailableWithoutFetching() == 1:
+        if not results.isExhausted():
+            page = Page()
+            self.pages.append(page)
+            
+            while results.getAvailableWithoutFetching() > 0:
                 page.add_row(results.one(), formatters)
-                self.pages.append(page)
-                return page
-            else:
-                page.add_row(results.one(), formatters)
+        
+            return page
+        return None
     
     def pagecount(self):
         return len(self.pages)
     
     def num_results(self, page_num):
         # change page_num to zero-index value
-        return len(self.pages[page_num-1])
+        return len(self.pages[page_num-1].data)
     
     def num_results_all_pages(self):
         return [len(page.data) for page in self.pages]
@@ -330,7 +329,7 @@ class TestPagingWithModifiers(HybridTester, PageAssertionMixin):
         
         expected_data = create_rows(cursor, 'paging_test', data, format_funcs=(str, cql_str))
 
-        stmt = SimpleStatement("select * from paging_test where id in (1,2) order by value asc")
+        stmt = SimpleStatement("select * from paging_test where id = 1 order by value asc")
         stmt.setFetchSize(5)
 
         results = cursor.execute(stmt)
@@ -345,6 +344,11 @@ class TestPagingWithModifiers(HybridTester, PageAssertionMixin):
         
         # these should be equal (in the same order)
         self.assertEqual(expected_data, pf.all_data())
+        
+        # make sure we don't allow paging over multiple partitions because that's weird
+        with self.assertRaisesRegexp(exceptions.InvalidQueryException, 'Cannot page queries with both ORDER BY and a IN restriction on the partition key'):
+            stmt = SimpleStatement("select * from paging_test where id in (1,2) order by value asc")
+            cursor.execute(stmt)
     
     def test_with_limit(self):
         cluster = self.cluster
@@ -551,7 +555,45 @@ class TestPagingSizeChange(HybridTester, PageAssertionMixin):
     Tests concerned with paging when the page size is changed between page retrievals.
     """
     def test_page_size_change(self):
-        pass
+        cluster = self.cluster
+        cluster.populate(3).start()
+        node1, node2, node3 = cluster.nodelist()
+        wait_for_node_alive(node1)
+        cursor = self.cql_connection(node1).cursor()
+        self.create_ks(cursor, 'test_paging_size', 2)
+        cursor.execute("CREATE TABLE paging_test ( id int, sometext text, PRIMARY KEY (id, sometext) )")
+
+        def random_txt(text):
+            return "'{random}'".format(random=uuid.uuid1())
+        
+        data = """
+              | id | sometext |
+         *2000| 1  | [random] |
+            """
+        create_rows(cursor, 'paging_test', data, format_funcs=(str, random_txt))
+        stmt = SimpleStatement("select * from paging_test where id = 1")
+        stmt.setFetchSize(1000)
+
+        results = cursor.execute(stmt)
+        pf = PageFetcher(
+            results, formatters = [('id', 'getInt', str), ('sometext', 'getString', str)]
+            )
+        pf.get_page()
+        self.assertEqual(pf.pagecount(), 1)
+        self.assertEqual(pf.num_results(1), 1000)
+        
+        stmt.setFetchSize(500)
+        
+        pf.get_page()
+        self.assertEqual(pf.pagecount(), 2)
+        self.assertEqual(pf.num_results(2), 500)
+        
+        stmt.setFetchSize(100)
+        
+        pf.get_all_pages()
+        self.assertEqual(pf.pagecount(), 7)
+        self.assertEqual(pf.num_results(3), 100)
+        self.assertEqual(pf.num_results_all_pages(), [1000,500,100,100,100,100,100])
     
     def test_page_size_set_multiple_times_before(self):
         pass
