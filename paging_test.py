@@ -666,10 +666,87 @@ class TestPagingDatasetChanges(HybridTester, PageAssertionMixin):
     Tests concerned with paging when the queried dataset changes while pages are being retrieved.
     """
     def test_data_change_impacting_earlier_page(self):
-        pass
+        cluster = self.cluster
+        cluster.populate(3).start()
+        node1, node2, node3 = cluster.nodelist()
+        wait_for_node_alive(node1)
+        cursor = self.cql_connection(node1).cursor()
+        self.create_ks(cursor, 'test_paging_size', 2)
+        cursor.execute("CREATE TABLE paging_test ( id int, mytext text, PRIMARY KEY (id, mytext) )")
+
+        def random_txt(text):
+            return "'{random}'".format(random=uuid.uuid1())
+
+        data = """
+              | id | mytext   |
+          *500| 1  | [random] |
+          *500| 2  | [random] |
+            """
+        expected_data = create_rows(cursor, 'paging_test', data, format_funcs=(str, random_txt))
+        
+        stmt = SimpleStatement("select * from paging_test where id in (1,2)")
+        # get 501 rows so we have definitely got the 1st row of the second partition
+        stmt.setFetchSize(501)
+
+        results = cursor.execute(stmt)
+        
+        pf = PageFetcher(
+            results, formatters = [('id', 'getInt', str), ('mytext', 'getString', cql_str)]
+            )
+        
+        pf.get_page()
+        
+        # we got one page and should be done with the first partition (for id=1)
+        # let's add another row for that first partition (id=1) and make sure it won't sneak into results
+        cursor.execute(SimpleStatement("insert into paging_test (id, mytext) values (1, 'foo')"))
+        
+        pf.get_all_pages()
+        self.assertEqual(pf.pagecount(), 2)
+        self.assertEqual(pf.num_results_all_pages(), [501, 499])
+        
+        self.assertEqualIgnoreOrder(pf.all_data(), expected_data)
     
     def test_data_change_impacting_later_page(self):
-        pass
+        cluster = self.cluster
+        cluster.populate(3).start()
+        node1, node2, node3 = cluster.nodelist()
+        wait_for_node_alive(node1)
+        cursor = self.cql_connection(node1).cursor()
+        self.create_ks(cursor, 'test_paging_size', 2)
+        cursor.execute("CREATE TABLE paging_test ( id int, mytext text, PRIMARY KEY (id, mytext) )")
+
+        def random_txt(text):
+            return "'{random}'".format(random=uuid.uuid1())
+
+        data = """
+              | id | mytext   |
+          *500| 1  | [random] |
+          *499| 2  | [random] |
+            """
+        expected_data = create_rows(cursor, 'paging_test', data, format_funcs=(str, random_txt))
+        
+        stmt = SimpleStatement("select * from paging_test where id in (1,2)")
+        stmt.setFetchSize(500)
+
+        results = cursor.execute(stmt)
+        
+        pf = PageFetcher(
+            results, formatters = [('id', 'getInt', str), ('mytext', 'getString', cql_str)]
+            )
+        
+        pf.get_page()
+        
+        # we've already paged the first partition, but adding a row for the second (id=2)
+        # should still result in the row being seen on the subsequent pages
+        cursor.execute(SimpleStatement("insert into paging_test (id, mytext) values (2, 'foo')"))
+        
+        pf.get_all_pages()
+        self.assertEqual(pf.pagecount(), 2)
+        self.assertEqual(pf.num_results_all_pages(), [500, 500])
+        
+        # add the new row to the expected data and then do a compare
+        expected_data.append([2, "'foo'"])
+        self.assertEqualIgnoreOrder(pf.all_data(), expected_data)
     
     def test_data_delete_removing_remainder(self):
         pass
