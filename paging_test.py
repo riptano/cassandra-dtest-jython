@@ -876,7 +876,92 @@ class TestPagingQueryIsolation(HybridTester, PageAssertionMixin):
     """
     Tests concerned with isolation of paged queries (queries can't affect each other).
     """
-    pass
+    def test_query_isolation(self):
+        """
+        Interleave some paged queries and make sure nothing bad happens.
+        """
+        cluster = self.cluster
+        cluster.populate(3).start()
+        node1, node2, node3 = cluster.nodelist()
+        wait_for_node_alive(node1)
+        cursor = self.cql_connection(node1).cursor()
+        self.create_ks(cursor, 'test_paging_size', 2)
+        cursor.execute("CREATE TABLE paging_test ( id int, mytext text, PRIMARY KEY (id, mytext) )")
+
+        def random_txt(text):
+            return "'{random}'".format(random=uuid.uuid1())
+
+        data = """
+               | id | mytext   |
+          *5000| 1  | [random] |
+          *5000| 2  | [random] |
+          *5000| 3  | [random] |
+          *5000| 4  | [random] |
+          *5000| 5  | [random] |
+          *5000| 6  | [random] |
+          *5000| 7  | [random] |
+          *5000| 8  | [random] |
+          *5000| 9  | [random] |
+          *5000| 10 | [random] |
+            """
+        expected_data = create_rows(data, cursor, 'paging_test', format_funcs=(str, random_txt))
+        
+        stmts = [
+            SimpleStatement("select * from paging_test where id in (1)").setFetchSize(500),
+            SimpleStatement("select * from paging_test where id in (2)").setFetchSize(600),
+            SimpleStatement("select * from paging_test where id in (3)").setFetchSize(700),
+            SimpleStatement("select * from paging_test where id in (4)").setFetchSize(800),
+            SimpleStatement("select * from paging_test where id in (5)").setFetchSize(900),
+            SimpleStatement("select * from paging_test where id in (1)").setFetchSize(1000),
+            SimpleStatement("select * from paging_test where id in (2)").setFetchSize(1100),
+            SimpleStatement("select * from paging_test where id in (3)").setFetchSize(1200),
+            SimpleStatement("select * from paging_test where id in (4)").setFetchSize(1300),
+            SimpleStatement("select * from paging_test where id in (5)").setFetchSize(1400),
+            SimpleStatement("select * from paging_test where id in (1,2,3,4,5,6,7,8,9,10)").setFetchSize(1500)
+        ]
+
+        page_fetchers = []
+        
+        for stmt in stmts:
+            results = cursor.execute(stmt)
+            pf = PageFetcher(
+                    results, formatters = [('id', 'getInt', str), ('mytext', 'getString', cql_str)]
+                    )
+            pf.get_page()
+            page_fetchers.append(pf)
+        
+        for pf in page_fetchers:
+            pf.get_page()
+        
+        for pf in page_fetchers:
+            pf.get_page()
+        
+        for pf in page_fetchers:
+            pf.get_remaining_pages()
+        
+        self.assertEqual(page_fetchers[0].pagecount(), 10)
+        self.assertEqual(page_fetchers[1].pagecount(), 9)
+        self.assertEqual(page_fetchers[2].pagecount(), 8)
+        self.assertEqual(page_fetchers[3].pagecount(), 7)
+        self.assertEqual(page_fetchers[4].pagecount(), 6)
+        self.assertEqual(page_fetchers[5].pagecount(), 5)
+        self.assertEqual(page_fetchers[6].pagecount(), 5)
+        self.assertEqual(page_fetchers[7].pagecount(), 5)
+        self.assertEqual(page_fetchers[8].pagecount(), 4)
+        self.assertEqual(page_fetchers[9].pagecount(), 4)
+        self.assertEqual(page_fetchers[10].pagecount(), 34)
+        
+        self.assertEqualIgnoreOrder(page_fetchers[0].all_data(), expected_data[:5000])
+        self.assertEqualIgnoreOrder(page_fetchers[1].all_data(), expected_data[5000:10000])
+        self.assertEqualIgnoreOrder(page_fetchers[2].all_data(), expected_data[10000:15000])
+        self.assertEqualIgnoreOrder(page_fetchers[3].all_data(), expected_data[15000:20000])
+        self.assertEqualIgnoreOrder(page_fetchers[4].all_data(), expected_data[20000:25000])
+        self.assertEqualIgnoreOrder(page_fetchers[5].all_data(), expected_data[:5000])
+        self.assertEqualIgnoreOrder(page_fetchers[6].all_data(), expected_data[5000:10000])
+        self.assertEqualIgnoreOrder(page_fetchers[7].all_data(), expected_data[10000:15000])
+        self.assertEqualIgnoreOrder(page_fetchers[8].all_data(), expected_data[15000:20000])
+        self.assertEqualIgnoreOrder(page_fetchers[9].all_data(), expected_data[20000:25000])
+        self.assertEqualIgnoreOrder(page_fetchers[10].all_data(), expected_data[:50000])
 
 if __name__ == '__main__':
     # unittest.main()
