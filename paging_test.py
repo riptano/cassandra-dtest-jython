@@ -349,7 +349,7 @@ class TestPagingWithModifiers(HybridTester, PageAssertionMixin):
         # these should be equal (in the same order)
         self.assertEqual(expected_data, pf.all_data())
         
-        # make sure we don't allow paging over multiple partitions because that's weird
+        # make sure we don't allow paging over multiple partitions with order because that's weird
         with self.assertRaisesRegexp(exceptions.InvalidQueryException, 'Cannot page queries with both ORDER BY and a IN restriction on the partition key'):
             stmt = SimpleStatement("select * from paging_test where id in (1,2) order by value asc")
             cursor.execute(stmt)
@@ -836,8 +836,42 @@ class TestPagingDatasetChanges(HybridTester, PageAssertionMixin):
         self.assertEqual(pf.num_results_all_pages(), [300, 300, 200])
     
     def test_node_unavailabe_during_paging(self):
-        pass
-    
+        cluster = self.cluster
+        cluster.populate(3).start()
+        node1, node2, node3 = cluster.nodelist()
+        wait_for_node_alive(node1)
+        cursor = self.cql_connection(node1).cursor()
+        self.create_ks(cursor, 'test_paging_size', 1)
+        cursor.execute("CREATE TABLE paging_test ( id uuid, mytext text, PRIMARY KEY (id, mytext) )")
+
+        def make_uuid(text):
+            return str(uuid.uuid4())
+
+        # create rows with TTL (some of which we'll try to get after expiry)
+        expected_data = create_rows("""
+                | id      | mytext |
+          *10000| [uuid]  | foo    |
+            """,
+            cursor, 'paging_test', format_funcs=(make_uuid, cql_str)
+            )
+        
+        stmt = SimpleStatement("select * from paging_test where mytext = 'foo' allow filtering")
+        stmt.setFetchSize(2000)
+
+        results = cursor.execute(stmt)
+        pf = PageFetcher(
+            results, formatters = [('id', 'getUUID', str), ('mytext', 'getString', cql_str)]
+            )
+        # this page will be partition id=1, it has TTL rows but they are not expired yet
+        pf.get_page()
+        
+        # stop a node and make sure we get an error trying to page the rest
+        node1.stop()
+        with self.assertRaisesRegexp(exceptions.UnavailableException, 'Not enough replica available for query at consistency ONE'):
+            pf.get_page()
+
+        # TODO: can we resume the node and expect to get more results from the result set or is it done?
+
 class TestPagingQueryIsolation(HybridTester, PageAssertionMixin):
     """
     Tests concerned with isolation of paged queries (queries can't affect each other).
