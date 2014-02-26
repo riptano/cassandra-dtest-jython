@@ -592,7 +592,6 @@ class TestPagingSizeChange(HybridTester, PageAssertionMixin):
         
         pf.get_all_pages()
         self.assertEqual(pf.pagecount(), 7)
-        self.assertEqual(pf.num_results(3), 100)
         self.assertEqual(pf.num_results_all_pages(), [1000,500,100,100,100,100,100])
     
     def test_page_size_set_multiple_times_before(self):
