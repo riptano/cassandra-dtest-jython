@@ -595,7 +595,35 @@ class TestPagingSizeChange(HybridTester, PageAssertionMixin):
         self.assertEqual(pf.num_results_all_pages(), [1000,500,100,100,100,100,100])
     
     def test_page_size_set_multiple_times_before(self):
-        pass
+        cluster = self.cluster
+        cluster.populate(3).start()
+        node1, node2, node3 = cluster.nodelist()
+        wait_for_node_alive(node1)
+        cursor = self.cql_connection(node1).cursor()
+        self.create_ks(cursor, 'test_paging_size', 2)
+        cursor.execute("CREATE TABLE paging_test ( id int, sometext text, PRIMARY KEY (id, sometext) )")
+
+        def random_txt(text):
+            return "'{random}'".format(random=uuid.uuid1())
+        
+        data = """
+              | id | sometext |
+         *2000| 1  | [random] |
+            """
+        create_rows(cursor, 'paging_test', data, format_funcs=(str, random_txt))
+        stmt = SimpleStatement("select * from paging_test where id = 1")
+        stmt.setFetchSize(1000)
+        stmt.setFetchSize(100)
+        stmt.setFetchSize(500)
+
+        results = cursor.execute(stmt)
+        pf = PageFetcher(
+            results, formatters = [('id', 'getInt', str), ('sometext', 'getString', str)]
+            )
+
+        pf.get_all_pages()
+        self.assertEqual(pf.pagecount(), 4)
+        self.assertEqual(pf.num_results_all_pages(), [500,500,500,500])
     
     def test_page_size_after_results_all_retrieved(self):
         """
