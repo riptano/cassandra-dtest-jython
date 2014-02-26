@@ -74,7 +74,7 @@ def parse_data_into_lists(data, format_funcs=None):
     
     return values
 
-def create_rows(cursor, table_name, data, format_funcs=None):
+def create_rows(data, cursor, table_name, format_funcs=None, prefix='', postfix=''):
     """
     Creates db rows using given cursor, with table name provided,
     using data formatted like:
@@ -94,7 +94,9 @@ def create_rows(cursor, table_name, data, format_funcs=None):
     
     for valueset in values:
         statements.append(
-            'INSERT INTO '+ table_name + ' (' + ', '.join(headers) + ') ' + 'VALUES (' + ', '.join(valueset) + ')'
+            "{prefix} INSERT INTO {table} ({cols}) values ({vals}) {postfix}".format(
+                prefix=prefix, table=table_name, cols=', '.join(headers), vals=', '.join(valueset), postfix=postfix
+                )
             )
     
     for stmt in statements:

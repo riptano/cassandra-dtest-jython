@@ -66,6 +66,10 @@ class PageFetcher(object):
         
         return self.pages
     
+    def get_remaining_pages(self):
+        # for better intent in tests
+        return self.get_all_pages()
+    
     def get_page(self):
         """Returns next page"""
         results = self.results
@@ -160,7 +164,7 @@ class TestPagingSize(HybridTester, PageAssertionMixin):
             |4 |and more testing|
             |5 |and more testing|
             """
-        expected_data = create_rows(cursor, 'paging_test', data, format_funcs=(str, cql_str))
+        expected_data = create_rows(data, cursor, 'paging_test', format_funcs=(str, cql_str))
 
         stmt = SimpleStatement("select * from paging_test")
         stmt.setFetchSize(100)
@@ -198,7 +202,7 @@ class TestPagingSize(HybridTester, PageAssertionMixin):
             |8 |and more testing|
             |9 |and more testing|
             """
-        expected_data = create_rows(cursor, 'paging_test', data, format_funcs=(str, cql_str))
+        expected_data = create_rows(data, cursor, 'paging_test', format_funcs=(str, cql_str))
 
         stmt = SimpleStatement("select * from paging_test")
         stmt.setFetchSize(5)
@@ -233,7 +237,7 @@ class TestPagingSize(HybridTester, PageAssertionMixin):
             |4 |and more testing|
             |5 |and more testing|
             """
-        expected_data = create_rows(cursor, 'paging_test', data, format_funcs=(str, cql_str))
+        expected_data = create_rows(data, cursor, 'paging_test', format_funcs=(str, cql_str))
 
         stmt = SimpleStatement("select * from paging_test")
         stmt.setFetchSize(5)
@@ -271,7 +275,7 @@ class TestPagingSize(HybridTester, PageAssertionMixin):
             |4 |and more testing|
             |5 |and more testing|
             """
-        expected_data = create_rows(cursor, 'paging_test', data, format_funcs=(str, cql_str))
+        expected_data = create_rows(data, cursor, 'paging_test', format_funcs=(str, cql_str))
 
         stmt = SimpleStatement("select * from paging_test")
         stmt.setFetchSize(0)
@@ -327,7 +331,7 @@ class TestPagingWithModifiers(HybridTester, PageAssertionMixin):
             |1 |j    |
             """
         
-        expected_data = create_rows(cursor, 'paging_test', data, format_funcs=(str, cql_str))
+        expected_data = create_rows(data, cursor, 'paging_test', format_funcs=(str, cql_str))
 
         stmt = SimpleStatement("select * from paging_test where id = 1 order by value asc")
         stmt.setFetchSize(5)
@@ -371,7 +375,7 @@ class TestPagingWithModifiers(HybridTester, PageAssertionMixin):
             |8 |and more testing|
             |9 |and more testing|
             """
-        expected_data = create_rows(cursor, 'paging_test', data, format_funcs=(str, cql_str))
+        expected_data = create_rows(data, cursor, 'paging_test', format_funcs=(str, cql_str))
 
         stmt = SimpleStatement("select * from paging_test limit 5")
         stmt.setFetchSize(9)
@@ -423,7 +427,7 @@ class TestPagingWithModifiers(HybridTester, PageAssertionMixin):
             |8 |and more testing|
             |9 |and more testing|
             """
-        create_rows(cursor, 'paging_test', data, format_funcs=(str, cql_str))
+        create_rows(data, cursor, 'paging_test', format_funcs=(str, cql_str))
         
         stmt = SimpleStatement("select * from paging_test where value = 'and more testing' ALLOW FILTERING")
         stmt.setFetchSize(4)
@@ -469,7 +473,7 @@ class TestPagingData(HybridTester, PageAssertionMixin):
               | id | value                  |
         *10000| 1  | [replaced with random] |
             """
-        expected_data = create_rows(cursor, 'paging_test', data, format_funcs=(str, random_txt))
+        expected_data = create_rows(data, cursor, 'paging_test', format_funcs=(str, random_txt))
         
         stmt = SimpleStatement("select * from paging_test where id = 1")
         stmt.setFetchSize(3000)
@@ -502,7 +506,7 @@ class TestPagingData(HybridTester, PageAssertionMixin):
          *5000| 1  | [replaced with random] |
          *5000| 2  | [replaced with random] |
             """
-        expected_data = create_rows(cursor, 'paging_test', data, format_funcs=(str, random_txt))
+        expected_data = create_rows(data, cursor, 'paging_test', format_funcs=(str, random_txt))
         
         stmt = SimpleStatement("select * from paging_test where id in (1,2)")
         stmt.setFetchSize(3000)
@@ -538,7 +542,7 @@ class TestPagingData(HybridTester, PageAssertionMixin):
          *500| 3  | True  | [random] |
          *400| 4  | False | [random] |
             """
-        create_rows(cursor, 'paging_test', data, format_funcs=(str, str, random_txt))
+        create_rows(data, cursor, 'paging_test', format_funcs=(str, str, random_txt))
         stmt = SimpleStatement("select * from paging_test where mybool = true")
         stmt.setFetchSize(400)
 
@@ -570,7 +574,7 @@ class TestPagingSizeChange(HybridTester, PageAssertionMixin):
               | id | sometext |
          *2000| 1  | [random] |
             """
-        create_rows(cursor, 'paging_test', data, format_funcs=(str, random_txt))
+        create_rows(data, cursor, 'paging_test', format_funcs=(str, random_txt))
         stmt = SimpleStatement("select * from paging_test where id = 1")
         stmt.setFetchSize(1000)
 
@@ -610,7 +614,7 @@ class TestPagingSizeChange(HybridTester, PageAssertionMixin):
               | id | sometext |
          *2000| 1  | [random] |
             """
-        create_rows(cursor, 'paging_test', data, format_funcs=(str, random_txt))
+        create_rows(data, cursor, 'paging_test', format_funcs=(str, random_txt))
         stmt = SimpleStatement("select * from paging_test where id = 1")
         stmt.setFetchSize(1000)
         stmt.setFetchSize(100)
@@ -644,7 +648,7 @@ class TestPagingSizeChange(HybridTester, PageAssertionMixin):
               | id | sometext |
          *2000| 1  | [random] |
             """
-        create_rows(cursor, 'paging_test', data, format_funcs=(str, random_txt))
+        create_rows(data, cursor, 'paging_test', format_funcs=(str, random_txt))
         stmt = SimpleStatement("select * from paging_test where id = 1")
         stmt.setFetchSize(500)
 
@@ -682,7 +686,7 @@ class TestPagingDatasetChanges(HybridTester, PageAssertionMixin):
           *500| 1  | [random] |
           *500| 2  | [random] |
             """
-        expected_data = create_rows(cursor, 'paging_test', data, format_funcs=(str, random_txt))
+        expected_data = create_rows(data, cursor, 'paging_test', format_funcs=(str, random_txt))
         
         stmt = SimpleStatement("select * from paging_test where id in (1,2)")
         # get 501 rows so we have definitely got the 1st row of the second partition
@@ -723,7 +727,7 @@ class TestPagingDatasetChanges(HybridTester, PageAssertionMixin):
           *500| 1  | [random] |
           *499| 2  | [random] |
             """
-        expected_data = create_rows(cursor, 'paging_test', data, format_funcs=(str, random_txt))
+        expected_data = create_rows(data, cursor, 'paging_test', format_funcs=(str, random_txt))
         
         stmt = SimpleStatement("select * from paging_test where id in (1,2)")
         stmt.setFetchSize(500)
@@ -765,10 +769,9 @@ class TestPagingDatasetChanges(HybridTester, PageAssertionMixin):
           *500| 1  | [random] |
           *500| 2  | [random] |
             """
-        expected_data = create_rows(cursor, 'paging_test', data, format_funcs=(str, random_txt))
+        expected_data = create_rows(data, cursor, 'paging_test', format_funcs=(str, random_txt))
         
         stmt = SimpleStatement("select * from paging_test where id in (1,2)")
-        # get 501 rows so we have definitely got the 1st row of the second partition
         stmt.setFetchSize(500)
 
         results = cursor.execute(stmt)
@@ -787,7 +790,50 @@ class TestPagingDatasetChanges(HybridTester, PageAssertionMixin):
         self.assertEqual(pf.num_results_all_pages(), [500])
     
     def test_data_TTL_expiry_during_paging(self):
-        pass
+        cluster = self.cluster
+        cluster.populate(3).start()
+        node1, node2, node3 = cluster.nodelist()
+        wait_for_node_alive(node1)
+        cursor = self.cql_connection(node1).cursor()
+        self.create_ks(cursor, 'test_paging_size', 2)
+        cursor.execute("CREATE TABLE paging_test ( id int, mytext text, PRIMARY KEY (id, mytext) )")
+
+        def random_txt(text):
+            return "'{random}'".format(random=uuid.uuid1())
+
+        # create rows with TTL (some of which we'll try to get after expiry)
+        create_rows("""
+              | id | mytext   |
+          *300| 1  | [random] |
+          *400| 2  | [random] |
+            """,
+            cursor, 'paging_test', format_funcs=(str, random_txt), postfix = 'USING TTL 10'
+            )
+        
+        # create rows without TTL
+        create_rows("""
+              | id | mytext   |
+          *500| 3  | [random] |
+            """,
+            cursor, 'paging_test', format_funcs=(str, random_txt)
+            )
+        
+        stmt = SimpleStatement("select * from paging_test where id in (1,2,3)")
+        stmt.setFetchSize(300)
+
+        results = cursor.execute(stmt)
+        pf = PageFetcher(
+            results, formatters = [('id', 'getInt', str), ('mytext', 'getString', cql_str)]
+            )
+        # this page will be partition id=1, it has TTL rows but they are not expired yet
+        pf.get_page()
+        
+        # sleep so that the remaining TTL rows from partition id=2 expire
+        time.sleep(15)
+        
+        pf.get_remaining_pages()
+        self.assertEqual(pf.pagecount(), 3)
+        self.assertEqual(pf.num_results_all_pages(), [300, 300, 200])
     
     def test_node_unavailabe_during_paging(self):
         pass
@@ -801,7 +847,7 @@ class TestPagingQueryIsolation(HybridTester, PageAssertionMixin):
 if __name__ == '__main__':
     # unittest.main()
     suite = unittest.TestSuite()
-    suite.addTest(TestPagingDatasetChanges("test_data_delete_removing_remainder"))
+    suite.addTest(TestPagingDatasetChanges("test_data_TTL_expiry_during_paging"))
     
     unittest.TextTestRunner(verbosity=2).run(suite)
     
