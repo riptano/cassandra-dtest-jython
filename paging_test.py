@@ -749,7 +749,42 @@ class TestPagingDatasetChanges(HybridTester, PageAssertionMixin):
         self.assertEqualIgnoreOrder(pf.all_data(), expected_data)
     
     def test_data_delete_removing_remainder(self):
-        pass
+        cluster = self.cluster
+        cluster.populate(3).start()
+        node1, node2, node3 = cluster.nodelist()
+        wait_for_node_alive(node1)
+        cursor = self.cql_connection(node1).cursor()
+        self.create_ks(cursor, 'test_paging_size', 2)
+        cursor.execute("CREATE TABLE paging_test ( id int, mytext text, PRIMARY KEY (id, mytext) )")
+
+        def random_txt(text):
+            return "'{random}'".format(random=uuid.uuid1())
+
+        data = """
+              | id | mytext   |
+          *500| 1  | [random] |
+          *500| 2  | [random] |
+            """
+        expected_data = create_rows(cursor, 'paging_test', data, format_funcs=(str, random_txt))
+        
+        stmt = SimpleStatement("select * from paging_test where id in (1,2)")
+        # get 501 rows so we have definitely got the 1st row of the second partition
+        stmt.setFetchSize(500)
+
+        results = cursor.execute(stmt)
+        
+        pf = PageFetcher(
+            results, formatters = [('id', 'getInt', str), ('mytext', 'getString', cql_str)]
+            )
+        
+        pf.get_page()
+        
+        # delete the results that would have shown up on page 2
+        cursor.execute(SimpleStatement("delete from paging_test where id = 2"))
+        
+        pf.get_all_pages()
+        self.assertEqual(pf.pagecount(), 1)
+        self.assertEqual(pf.num_results_all_pages(), [500])
     
     def test_data_TTL_expiry_during_paging(self):
         pass
@@ -766,7 +801,7 @@ class TestPagingQueryIsolation(HybridTester, PageAssertionMixin):
 if __name__ == '__main__':
     # unittest.main()
     suite = unittest.TestSuite()
-    suite.addTest(TestPagingData("test_paging_using_secondary_indexes"))
+    suite.addTest(TestPagingDatasetChanges("test_data_delete_removing_remainder"))
     
     unittest.TextTestRunner(verbosity=2).run(suite)
     
