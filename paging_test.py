@@ -964,10 +964,4 @@ class TestPagingQueryIsolation(HybridTester, PageAssertionMixin):
         self.assertEqualIgnoreOrder(page_fetchers[10].all_data(), expected_data[:50000])
 
 if __name__ == '__main__':
-    # unittest.main()
-    suite = unittest.TestSuite()
-    suite.addTest(TestPagingDatasetChanges("test_data_TTL_expiry_during_paging"))
-    
-    unittest.TextTestRunner(verbosity=2).run(suite)
-    
-    exit(0)
+    unittest.main()
