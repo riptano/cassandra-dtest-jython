@@ -789,7 +789,7 @@ class TestPagingDatasetChanges(HybridTester, PageAssertionMixin):
         self.assertEqual(pf.pagecount(), 1)
         self.assertEqual(pf.num_results_all_pages(), [500])
     
-    def test_data_TTL_expiry_during_paging(self):
+    def test_row_TTL_expiry_during_paging(self):
         cluster = self.cluster
         cluster.populate(3).start()
         node1, node2, node3 = cluster.nodelist()
@@ -835,6 +835,74 @@ class TestPagingDatasetChanges(HybridTester, PageAssertionMixin):
         self.assertEqual(pf.pagecount(), 3)
         self.assertEqual(pf.num_results_all_pages(), [300, 300, 200])
     
+    def test_cell_TTL_expiry_during_paging(self):
+        cluster = self.cluster
+        cluster.populate(3).start()
+        node1, node2, node3 = cluster.nodelist()
+        wait_for_node_alive(node1)
+        cursor = self.cql_connection(node1).cursor()
+        self.create_ks(cursor, 'test_paging_size', 2)
+        cursor.execute("""
+            CREATE TABLE paging_test (
+                id int,
+                mytext text,
+                somevalue text,
+                anothervalue text,
+                PRIMARY KEY (id, mytext) )
+            """)
+
+        def random_txt(text):
+            return "'{random}'".format(random=uuid.uuid1())
+
+        data = create_rows("""
+              | id | mytext   | somevalue | anothervalue |
+          *500| 1  | [random] | foo       |  bar         |
+          *500| 2  | [random] | foo       |  bar         |
+          *500| 3  | [random] | foo       |  bar         |
+            """,
+            cursor, 'paging_test', format_funcs=(str, random_txt, cql_str, cql_str)
+            )
+        
+        stmt = SimpleStatement("select * from paging_test where id in (1,2,3)")
+        stmt.setFetchSize(500)
+
+        results = cursor.execute(stmt)
+        pf = PageFetcher(
+            results, formatters = [
+                ('id', 'getInt', str),
+                ('mytext', 'getString', cql_str),
+                ('somevalue', 'getString', cql_str),
+                ('anothervalue', 'getString', cql_str)
+                ]
+            )
+        # get the first page and check values
+        page1 = pf.get_page().data
+        self.assertEqualIgnoreOrder(page1, data[:500])
+        
+        # set some TTLs for data on page 3
+        for (_id, mytext, somevalue, anothervalue) in data[1000:1500]:
+            stmt = """
+                update paging_test using TTL 10
+                set somevalue='one'
+                where id = {id} and mytext = {mytext}
+                """.format(id=_id, mytext=mytext)
+            cursor.execute(stmt)
+        
+        # check page two
+        page2 = pf.get_page().data
+        self.assertEqualIgnoreOrder(page2, data[500:1000])
+
+        page3expected = []
+        for (_id, mytext, somevalue, anothervalue) in data[1000:1500]:
+            page3expected.append([_id, mytext, "'None'", "'bar'"])
+        
+        time.sleep(15)
+        
+        page3 = pf.get_page().data
+        self.assertEqualIgnoreOrder(page3, page3expected)
+        
+        # TODO: modify test to TTL more than one column after CASSANDRA-6782 is resolved.
+    
     def test_node_unavailabe_during_paging(self):
         cluster = self.cluster
         cluster.populate(3).start()
@@ -847,7 +915,6 @@ class TestPagingDatasetChanges(HybridTester, PageAssertionMixin):
         def make_uuid(text):
             return str(uuid.uuid4())
 
-        # create rows with TTL (some of which we'll try to get after expiry)
         expected_data = create_rows("""
                 | id      | mytext |
           *10000| [uuid]  | foo    |
