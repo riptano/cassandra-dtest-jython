@@ -929,14 +929,14 @@ class TestPagingDatasetChanges(HybridTester, PageAssertionMixin):
         pf = PageFetcher(
             results, formatters = [('id', 'getUUID', str), ('mytext', 'getString', cql_str)]
             )
-        # this page will be partition id=1, it has TTL rows but they are not expired yet
+
         pf.get_page()
         
         # stop a node and make sure we get an error trying to page the rest
         node1.stop()
         with self.assertRaisesRegexp(exceptions.UnavailableException, 'Not enough replica available for query at consistency ONE'):
-            pf.get_page()
-
+            pf.get_remaining_pages()
+        
         # TODO: can we resume the node and expect to get more results from the result set or is it done?
 
 class TestPagingQueryIsolation(HybridTester, PageAssertionMixin):
