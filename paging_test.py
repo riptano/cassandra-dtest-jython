@@ -265,17 +265,17 @@ class TestPagingSize(HybridTester, PageAssertionMixin):
         wait_for_node_alive(node1)
         cursor = self.cql_connection(node1).cursor()
         self.create_ks(cursor, 'test_paging_size', 2)
-        cursor.execute("CREATE TABLE paging_test ( id int PRIMARY KEY, value text )")
+        cursor.execute("CREATE TABLE paging_test ( id uuid PRIMARY KEY, value text )")
+
+        def random_txt(text):
+            return "{random}".format(random=uuid.uuid1())
 
         data = """
-            |id|value           |
-            |1 |testing         |
-            |2 |and more testing|
-            |3 |and more testing|
-            |4 |and more testing|
-            |5 |and more testing|
+              | id     |value   |
+         *5001| [uuid] |testing |
             """
-        expected_data = create_rows(data, cursor, 'paging_test', format_funcs=(str, cql_str))
+        expected_data = create_rows(data, cursor, 'paging_test', format_funcs=(random_txt, cql_str))
+        time.sleep(5)
 
         stmt = SimpleStatement("select * from paging_test")
         stmt.setFetchSize(0)
@@ -283,12 +283,12 @@ class TestPagingSize(HybridTester, PageAssertionMixin):
         results = cursor.execute(stmt)
         
         pf = PageFetcher(
-            results, formatters = [('id', 'getInt', str), ('value', 'getString', cql_str)]
+            results, formatters = [('id', 'getUUID', str), ('value', 'getString', cql_str)]
             )
 
         pf.get_all_pages()
-        self.assertEqual(pf.pagecount(), 1)
-        self.assertEqual(pf.num_results_all_pages(), [5])
+        self.assertEqual(pf.pagecount(), 2)
+        self.assertEqual(pf.num_results_all_pages(), [5000, 1])
         
         # make sure expected and actual have same data elements (ignoring order)
         self.assertEqualIgnoreOrder(expected_data, pf.all_data())
@@ -929,14 +929,14 @@ class TestPagingDatasetChanges(HybridTester, PageAssertionMixin):
         pf = PageFetcher(
             results, formatters = [('id', 'getUUID', str), ('mytext', 'getString', cql_str)]
             )
-        # this page will be partition id=1, it has TTL rows but they are not expired yet
+
         pf.get_page()
         
         # stop a node and make sure we get an error trying to page the rest
         node1.stop()
         with self.assertRaisesRegexp(exceptions.UnavailableException, 'Not enough replica available for query at consistency ONE'):
-            pf.get_page()
-
+            pf.get_remaining_pages()
+        
         # TODO: can we resume the node and expect to get more results from the result set or is it done?
 
 class TestPagingQueryIsolation(HybridTester, PageAssertionMixin):
