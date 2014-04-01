@@ -1,6 +1,5 @@
-import os, tempfile, sys, shutil, types, time, threading, ConfigParser, logging
+import re, os, tempfile, sys, shutil, time, ConfigParser, logging
 from ccmlib.cluster import Cluster
-from ccmlib.node import Node
 from unittest import TestCase
 
 # java
