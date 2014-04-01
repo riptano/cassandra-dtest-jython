@@ -128,6 +128,14 @@ class TestPagingSize(HybridTester, PageAssertionMixin):
     Basic tests relating to page size (relative to results set)
     and validation of page size setting.
     """
+    def __init__(self, *args, **kwargs):
+        # Ignore these log patterns:
+        self.ignore_log_patterns = [
+            # CASSANDRA-6964
+            r'ByteBuf\.release\(\) was not called before it\'s garbage-collected',
+        ]
+        HybridTester.__init__(self, *args, **kwargs)
+        
     def test_with_no_results(self):
         """
         No errors when a page is requested and query has no results.
