@@ -128,14 +128,6 @@ class TestPagingSize(HybridTester, PageAssertionMixin):
     Basic tests relating to page size (relative to results set)
     and validation of page size setting.
     """
-    def __init__(self, *args, **kwargs):
-        # Ignore these log patterns:
-        self.ignore_log_patterns = [
-            # CASSANDRA-6964
-            r'ByteBuf\.release\(\) was not called before it\'s garbage-collected',
-        ]
-        HybridTester.__init__(self, *args, **kwargs)
-        
     def test_with_no_results(self):
         """
         No errors when a page is requested and query has no results.
@@ -305,14 +297,6 @@ class TestPagingWithModifiers(HybridTester, PageAssertionMixin):
     """
     Tests concerned with paging when CQL modifiers (such as order, limit, allow filtering) are used.
     """
-    def __init__(self, *args, **kwargs):
-        # Ignore these log patterns:
-        self.ignore_log_patterns = [
-            # CASSANDRA-6964
-            r'ByteBuf\.release\(\) was not called before it\'s garbage-collected',
-        ]
-        HybridTester.__init__(self, *args, **kwargs)
-        
     def test_with_order_by(self):
         """"
         Paging over a single partition with ordering should work.
@@ -473,14 +457,6 @@ class TestPagingWithModifiers(HybridTester, PageAssertionMixin):
             ))
 
 class TestPagingData(HybridTester, PageAssertionMixin):
-    def __init__(self, *args, **kwargs):
-        # Ignore these log patterns:
-        self.ignore_log_patterns = [
-            # CASSANDRA-6964
-            r'ByteBuf\.release\(\) was not called before it\'s garbage-collected',
-        ]
-        HybridTester.__init__(self, *args, **kwargs)
-        
     def test_paging_a_single_wide_row(self):
         cluster = self.cluster
         cluster.populate(3).start()
@@ -582,14 +558,6 @@ class TestPagingSizeChange(HybridTester, PageAssertionMixin):
     """
     Tests concerned with paging when the page size is changed between page retrievals.
     """
-    def __init__(self, *args, **kwargs):
-        # Ignore these log patterns:
-        self.ignore_log_patterns = [
-            # CASSANDRA-6964
-            r'ByteBuf\.release\(\) was not called before it\'s garbage-collected',
-        ]
-        HybridTester.__init__(self, *args, **kwargs)
-        
     def test_page_size_change(self):
         cluster = self.cluster
         cluster.populate(3).start()
@@ -701,14 +669,6 @@ class TestPagingDatasetChanges(HybridTester, PageAssertionMixin):
     """
     Tests concerned with paging when the queried dataset changes while pages are being retrieved.
     """
-    def __init__(self, *args, **kwargs):
-        # Ignore these log patterns:
-        self.ignore_log_patterns = [
-            # CASSANDRA-6964
-            r'ByteBuf\.release\(\) was not called before it\'s garbage-collected',
-        ]
-        HybridTester.__init__(self, *args, **kwargs)
-        
     def test_data_change_impacting_earlier_page(self):
         cluster = self.cluster
         cluster.populate(3).start()
@@ -983,14 +943,6 @@ class TestPagingQueryIsolation(HybridTester, PageAssertionMixin):
     """
     Tests concerned with isolation of paged queries (queries can't affect each other).
     """
-    def __init__(self, *args, **kwargs):
-        # Ignore these log patterns:
-        self.ignore_log_patterns = [
-            # CASSANDRA-6964
-            r'ByteBuf\.release\(\) was not called before it\'s garbage-collected',
-        ]
-        HybridTester.__init__(self, *args, **kwargs)
-        
     def test_query_isolation(self):
         """
         Interleave some paged queries and make sure nothing bad happens.
