@@ -86,6 +86,8 @@ class HybridTester(TestCase):
         return cluster
 
     def setUp(self):
+        debug("Preparing to run: {}".format(self.id()))
+        
         # cleaning up if a previous execution didn't trigger tearDown (which
         # can happen if it is interrupted by KeyboardInterrupt)
         # TODO: move that part to a generic fixture
