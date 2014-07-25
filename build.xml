@@ -35,7 +35,7 @@
     </exec>
     <!-- CCM -->
     <exec executable="${jython.dir}/bin/easy_install">
-      <arg value="pylib/ccm-git-ad50f9a5db92.zip" />
+      <arg value="pylib/ccm-9f7f93a5ae3c.tar.gz" />
     </exec>
     <!-- Nose -->
     <exec executable="${jython.dir}/bin/easy_install">
