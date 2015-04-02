@@ -1,3 +1,7 @@
+## DEPRECATED
+
+All paging tests have been ported to Python and can be found at www.github.com/riptano/cassandra-dtest
+
 ## Cassandra Jython Dtests
 
 Just a simple Jython project that connects to Cassandra and runs tests utilizing the DataStax Java Driver.
